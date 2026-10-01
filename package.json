@@ -1,0 +1,29 @@
+{
+  "name": "oc-notifyondone",
+  "version": "1.0.0",
+  "description": "OpenCode plugin that notifies via ntfy when a model finishes responding",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "ntfy",
+    "notification"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@opencode/plugin": "^2.0.21"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}
