@@ -1,28 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { buildNotification, composeNotification, detectDone, markCompleted, projectName, textFragment } from "../src/index"
+import { buildNotification, composeNotification, detectDone, projectName, textFragment } from "../src/index"
 import { resolve } from "../src/options"
-
-describe("terminal event deduplication", () => {
-  test("collapses different finish events for the same turn", () => {
-    const completed = new Set<string>()
-    const step = detectDone({
-      type: "session.step.ended",
-      data: { sessionID: "ses_1", assistantMessageID: "msg_1", finish: "stop" },
-    })
-    const idle = detectDone({
-      type: "session.status",
-      data: { sessionID: "ses_1", status: { type: "idle" } },
-    })
-
-    expect(step).toBeDefined()
-    expect(idle).toBeDefined()
-    expect(markCompleted(completed, step!.sessionID)).toBe(true)
-    expect(markCompleted(completed, idle!.sessionID)).toBe(false)
-
-    completed.delete("ses_1")
-    expect(markCompleted(completed, "ses_1")).toBe(true)
-  })
-})
 
 describe("textFragment", () => {
   test("reads a completed text block", () => {

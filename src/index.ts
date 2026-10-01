@@ -35,13 +35,6 @@ export interface Done {
   failed: boolean
 }
 
-export function markCompleted(completed: Set<string>, sessionID: string): boolean {
-  if (completed.has(sessionID)) return false
-  completed.add(sessionID)
-  while (completed.size > 500) completed.delete(completed.values().next().value as string)
-  return true
-}
-
 /** `session.text.ended` carries the completed text block for one assistant message. */
 export function textFragment(event: unknown): { sessionID: string; messageID: string; text: string } | undefined {
   const data = eventData(event)
@@ -142,14 +135,16 @@ export default Plugin.define({
     }
 
     const controller = new AbortController()
-    // Dedupes terminal events for one turn; reset when the next turn starts.
-    const completed = new Set<string>()
+    // Dedupes repeat deliveries for one response; bounded so a long-lived server cannot grow it.
+    const sent = new Set<string>()
     // Assistant text seen on the stream, so the common case needs no session read.
     const fragments = new Map<string, string>()
     // In-flight delivery, so a short-lived process can finish it during cleanup.
     let pending: Promise<unknown> | undefined
 
     const notify = async (done: Done, text?: string) => {
+      sent.add(done.key)
+      while (sent.size > 500) sent.delete(sent.values().next().value as string)
       fragments.delete(done.key)
       try {
         let notification
@@ -175,14 +170,8 @@ export default Plugin.define({
         for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
           const fragment = textFragment(event)
           if (fragment) fragments.set(fragment.messageID, fragment.text)
-          const data = eventData(event)
-          const type = isRecord(event) ? event.type : undefined
-          const resetting =
-            type === "session.execution.started" ||
-            (type === "session.status" && isRecord(data?.status) && data.status.type === "busy")
-          if (typeof data?.sessionID === "string" && resetting) completed.delete(data.sessionID)
           const done = detectDone(event)
-          if (!done || !markCompleted(completed, done.sessionID)) continue
+          if (!done || sent.has(done.key)) continue
           pending = notify(done, fragments.get(done.key))
           await pending
           pending = undefined
@@ -194,7 +183,7 @@ export default Plugin.define({
 
     return async () => {
       controller.abort()
-      completed.clear()
+      sent.clear()
       // A one-shot run tears down as soon as the turn ends; let an in-flight POST finish.
       if (pending) await pending.catch(() => {})
     }
