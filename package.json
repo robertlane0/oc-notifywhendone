@@ -10,10 +10,12 @@
     "ntfy",
     "notification"
   ],
+  "main": "./index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./index.ts"
   },
   "files": [
+    "index.ts",
     "src"
   ],
   "scripts": {
