@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { buildNotification, composeNotification, detectDone, projectName, textFragment } from "../src/index"
+import { buildNotification, claimNotification, composeNotification, detectDone, projectName, textFragment } from "../src/index"
 import { resolve } from "../src/options"
+
+describe("cross-instance deduplication", () => {
+  test("only claims a completion once across plugin instances", () => {
+    const key = `cross-instance-${crypto.randomUUID()}`
+    expect(claimNotification(key)).toBe(true)
+    expect(claimNotification(key)).toBe(false)
+  })
+})
 
 describe("textFragment", () => {
   test("reads a completed text block", () => {

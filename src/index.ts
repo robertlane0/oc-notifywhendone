@@ -14,6 +14,21 @@ function report(message: string, error?: unknown) {
   console.error(`[oc-notifyondone] ${message}${detail}`)
 }
 
+const GLOBAL_SENT_KEY = Symbol.for("oc-notifyondone.sent")
+
+function sentSet(): Set<string> {
+  const global = globalThis as typeof globalThis & { [GLOBAL_SENT_KEY]?: Set<string> }
+  return (global[GLOBAL_SENT_KEY] ??= new Set<string>())
+}
+
+export function claimNotification(key: string): boolean {
+  const sent = sentSet()
+  if (sent.has(key)) return false
+  sent.add(key)
+  while (sent.size > 500) sent.delete(sent.values().next().value as string)
+  return true
+}
+
 /** Append-only diagnostics for delivery troubleshooting; opt-in via NTFY_DEBUG_FILE. */
 async function trace(line: string) {
   const file = process.env.NTFY_DEBUG_FILE
@@ -135,16 +150,12 @@ export default Plugin.define({
     }
 
     const controller = new AbortController()
-    // Dedupes repeat deliveries for one response; bounded so a long-lived server cannot grow it.
-    const sent = new Set<string>()
     // Assistant text seen on the stream, so the common case needs no session read.
     const fragments = new Map<string, string>()
     // In-flight delivery, so a short-lived process can finish it during cleanup.
     let pending: Promise<unknown> | undefined
 
     const notify = async (done: Done, text?: string) => {
-      sent.add(done.key)
-      while (sent.size > 500) sent.delete(sent.values().next().value as string)
       fragments.delete(done.key)
       try {
         let notification
@@ -171,7 +182,7 @@ export default Plugin.define({
           const fragment = textFragment(event)
           if (fragment) fragments.set(fragment.messageID, fragment.text)
           const done = detectDone(event)
-          if (!done || sent.has(done.key)) continue
+          if (!done || !claimNotification(done.key)) continue
           pending = notify(done, fragments.get(done.key))
           await pending
           pending = undefined
@@ -183,7 +194,6 @@ export default Plugin.define({
 
     return async () => {
       controller.abort()
-      sent.clear()
       // A one-shot run tears down as soon as the turn ends; let an in-flight POST finish.
       if (pending) await pending.catch(() => {})
     }
